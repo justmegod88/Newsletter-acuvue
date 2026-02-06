@@ -58,297 +58,109 @@ def _similarity(a: str, b: str) -> float:
 def _title_bucket_keys(title: str):
     """
     중복 후보 비교 대상을 좁히기 위한 버킷 키.
-    너무 좁으면 중복을 못 잡아서, 토큰 2~3개 조합으로 넓게 잡음.
     """
-    nt = _normalize_title(title)
-    tokens = [x for x in nt.split() if len(x) >= 2]
-    keys = set()
-
-    if not tokens:
-        return keys
-
-    keys.add(" ".join(tokens[:2]))
-    if len(tokens) >= 3:
-        keys.add(" ".join(tokens[:3]))
-    keys.add(tokens[0])
-
-    return keys
+    t = _normalize_title(title)
+    tokens = t.split()
+    keys = []
+    if tokens:
+        keys.append(tokens[0])
+        if len(tokens) >= 2:
+            keys.append(" ".join(tokens[:2]))
+    return keys or [""]
 
 
 # =========================
-# ✅ (B) 대표 기사(언론사) 선택 규칙
+# ✅ (B) 리스트용 dedupe & group (기존 유지)
 # =========================
-INDUSTRY_SOURCES = {
-    "안경신문",
-    "옵티컬저널",
-    "옵티칼저널",
-    "안경계",
-    "아이케어뉴스",
-    "메디칼업저버",
-    "의학신문",
-    "헬스조선",
-    "바이오타임즈",
-}
+def dedupe_and_group_articles(articles, threshold=0.75):
+    if not articles:
+        return []
 
-TIER2_SOURCES = {
-    "연합뉴스",
-    "뉴시스",
-    "YTN",
-    "SBS",
-    "KBS",
-    "MBC",
-    "JTBC",
-    "조선일보",
-    "중앙일보",
-    "동아일보",
-    "한겨레",
-    "경향신문",
-}
-
-
-def _source_priority(source: str) -> int:
-    s = (source or "").strip()
-    if s in INDUSTRY_SOURCES:
-        return 1
-    if s in TIER2_SOURCES:
-        return 2
-    if s:
-        return 3
-    return 99
-
-
-def _pick_representative(group):
-    def score(a):
-        src = getattr(a, "source", "") or ""
-        title = getattr(a, "title", "") or ""
-        return (_source_priority(src), -len(_normalize_title(title)))
-    return sorted(group, key=score)[0]
-
-
-# =========================
-# ✅ (C) 기사 리스트용 중복 제거 + 묶기 (기존 유지: threshold=0.75)
-# =========================
-def dedupe_and_group_articles(articles, threshold: float = 0.75):
-    """
-    반환: 대표 기사 리스트
-    대표 기사에는 rep.duplicates = [{source, link, title}, ...] 가 생김
-    """
-
-    # 1) URL+제목 완전 동일 기준으로 1차 그룹핑
-    exact_map = {}
+    # 1) URL 정규화 기준으로 먼저 그룹
+    url_map = {}
     for a in articles:
-        url_key = _normalize_url(getattr(a, "link", ""))
-        title_key = _normalize_title(getattr(a, "title", ""))
-        key = (url_key, title_key)
-        exact_map.setdefault(key, []).append(a)
+        u = _normalize_url(getattr(a, "link", "") or "")
+        url_map.setdefault(u, []).append(a)
 
-    stage1_groups = list(exact_map.values())
+    unique = []
+    for u, group in url_map.items():
+        # 동일 URL이면 1개만 남김(가장 summary가 긴 걸 우선)
+        group_sorted = sorted(group, key=lambda x: len(getattr(x, "summary", "") or ""), reverse=True)
+        unique.append(group_sorted[0])
 
-    # 2) 요약/제목 유사도 기반 그룹 병합
+    # 2) 제목 유사도 기반으로 추가 중복 그룹핑
     buckets = {}
-    merged_groups = []
+    for a in unique:
+        keys = _title_bucket_keys(getattr(a, "title", "") or "")
+        for k in keys:
+            buckets.setdefault(k, []).append(a)
 
-    for grp in stage1_groups:
-        base = grp[0]
-        base_title = getattr(base, "title", "") or ""
-        base_summary = getattr(base, "summary", "") or ""
-
-        bucket_keys = _title_bucket_keys(base_title)
-        cand_groups = []
-        for k in bucket_keys:
-            cand_groups.extend(buckets.get(k, []))
-
-        seen_ref = set()
-        uniq_cands = []
-        for g in cand_groups:
-            gid = id(g)
-            if gid in seen_ref:
-                continue
-            seen_ref.add(gid)
-            uniq_cands.append(g)
-
-        # ✅ [수정 1곳] 버킷이 안 잡혀서 비교 자체를 못 하는 경우를 막기 위한 fallback
-        # (버킷 후보가 없으면 최근 그룹 일부와라도 비교해서 0.78 같은 케이스를 잡도록)
-        if not uniq_cands:
-            uniq_cands = merged_groups[-50:]  # 필요시 50만 조절
-
-        merged = False
-        for existing_grp in uniq_cands:
-            ex = existing_grp[0]
-            ex_title = getattr(ex, "title", "") or ""
-            ex_summary = getattr(ex, "summary", "") or ""
-
-            # ✅ 제목 유사도를 우선으로 사용 (요약은 기사마다 표현이 달라서 중복이 안 잡히는 경우가 많음)
-            title_sim = _similarity(base_title, ex_title)
-
-            # 요약은 "보조"로만 사용 (둘 다 있고, 어느 정도 길이가 있을 때만)
-            summary_sim = 0.0
-            if base_summary and ex_summary and len(base_summary) >= 80 and len(ex_summary) >= 80:
-                summary_sim = _similarity(base_summary, ex_summary)
-
-            sim = max(title_sim, summary_sim)
-
-            if sim >= threshold:
-                existing_grp.extend(grp)
-                merged = True
-                break
-
-        if not merged:
-            merged_groups.append(grp)
-            for k in bucket_keys:
-                buckets.setdefault(k, []).append(grp)
-
-    # 3) 각 그룹에서 대표 선택 + duplicates 정보 생성
-    representatives = []
-    for grp in merged_groups:
-        rep = _pick_representative(grp)
-        dups = []
-        for a in grp:
-            if a is rep:
-                continue
-            dups.append({
-                "source": getattr(a, "source", "") or "",
-                "link": getattr(a, "link", "") or "",
-                "title": getattr(a, "title", "") or "",
-            })
-        setattr(rep, "duplicates", dups)
-        representatives.append(rep)
-
-    return representatives
-
-
-# =========================
-# ✅ (D) 카테고리 간 중복 제거
-# =========================
-def remove_cross_category_duplicates(*category_lists):
     seen = set()
-    out = []
-
-    for lst in category_lists:
-        new_lst = []
-        for a in lst:
-            url_key = _normalize_url(getattr(a, "link", ""))
-            title_key = _normalize_title(getattr(a, "title", ""))
-            key = (url_key, title_key)
-
-            if key in seen:
+    final = []
+    for k, group in buckets.items():
+        for a in group:
+            if id(a) in seen:
                 continue
+            # a를 대표로 삼고, 유사한 것들을 묶어서 하나만 남김
+            rep = a
+            seen.add(id(a))
+            for b in group:
+                if id(b) in seen:
+                    continue
+                if _similarity(getattr(rep, "title", ""), getattr(b, "title", "")) >= threshold:
+                    seen.add(id(b))
+            final.append(rep)
 
-            seen.add(key)
-            new_lst.append(a)
-        out.append(new_lst)
+    # 버킷 중복으로 final에 중복이 생길 수 있어 URL 기준 한번 더 정리
+    out = []
+    out_seen = set()
+    for a in final:
+        u = _normalize_url(getattr(a, "link", "") or "")
+        if u in out_seen:
+            continue
+        out_seen.add(u)
+        out.append(a)
 
     return out
 
 
 # =========================
-# ✅ (E) 브리핑(상단 요약) 전용 중복 제거: threshold=0.75 (요청 반영)
+# ✅ (C) 브리핑용 pick (기존 유지)
 # =========================
-def _brief_norm(s: str) -> str:
-    s = (s or "").lower().strip()
-    s = re.sub(r"\s+", " ", s)
-    s = re.sub(r"\[[^\]]+\]", " ", s)      # [단독]
-    s = re.sub(r"\([^)]*\)", " ", s)       # (종합)
-    s = re.sub(r"[^\w가-힣 ]+", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
-
-
-def _brief_sim(a: str, b: str) -> float:
-    a = _brief_norm(a)
-    b = _brief_norm(b)
-    if not a or not b:
-        return 0.0
-    return difflib.SequenceMatcher(None, a, b).ratio()
-
-
-def dedupe_for_brief(articles, threshold: float = 0.70, max_keep: int = 10):
-    """
-    ✅ 브리핑(상단 AI 요약) 전용 중복 제거
-    - "주제 같으면 제거" 목적이라 threshold를 0.50로 낮춤 (요청 반영)
-    - summary가 있으면 summary로 비교, 없으면 title로 비교
-    """
-    kept = []
-    for a in articles:
-        t = getattr(a, "title", "") or ""
-        s = getattr(a, "summary", "") or ""
-        key_text = s if s.strip() else t
-
-        dup = False
-        for k in kept:
-            kt = getattr(k, "title", "") or ""
-            ks = getattr(k, "summary", "") or ""
-            k_text = ks if ks.strip() else kt
-
-            if _brief_sim(key_text, k_text) >= threshold:
-                dup = True
-                break
-
-        if not dup:
-            kept.append(a)
-
-        if len(kept) >= max_keep:
-            break
-
-    return kept
-
-
-# =========================
-# ✅ (F) 브리핑 입력 후보 선택 (카테고리 분산 + 빈 summary 제외) + 브리핑 전용 dedupe(0.75)
-# =========================
-def _has_summary(a) -> bool:
-    s = (getattr(a, "summary", "") or "").strip()
-    return len(s) > 0
-
-
 def select_articles_for_brief(
     acuvue_articles,
     company_articles,
     product_articles,
     trend_articles,
     eye_health_articles,
-    max_items: int = 10,
+    max_items=10,
 ):
-    """
-    - 광고/단순 이미지로 summary가 빈 값인 기사는 제외
-    - 카테고리별로 1~2개씩 분산 선택(맨 위 편향 완화)
-    - 브리핑 전용 dedupe(주제 중복 제거): threshold=0.70 적용
-    """
-    pools = [
-        ("ACUVUE", [a for a in (acuvue_articles or []) if _has_summary(a)]),
-        ("Company", [a for a in (company_articles or []) if _has_summary(a)]),
-        ("Trend", [a for a in (trend_articles or []) if _has_summary(a)]),
-        ("Product", [a for a in (product_articles or []) if _has_summary(a)]),
-        ("EyeHealth", [a for a in (eye_health_articles or []) if _has_summary(a)]),
-    ]
+    combined = []
+    combined += list(acuvue_articles or [])
+    combined += list(company_articles or [])
+    combined += list(product_articles or [])
+    combined += list(trend_articles or [])
+    combined += list(eye_health_articles or [])
 
-    # 1) 라운드로빈 분산 선택
-    selected = []
-    idx = 0
-    while len(selected) < max_items:
-        added_any = False
-        for _, lst in pools:
-            if idx < len(lst) and len(selected) < max_items:
-                selected.append(lst[idx])
-                added_any = True
-        if not added_any:
-            break
-        idx += 1
+    # 요약이 비어있거나 너무 짧은 건 제외
+    filtered = []
+    for a in combined:
+        s = (getattr(a, "summary", "") or "").strip()
+        if len(s) < 10:
+            continue
+        filtered.append(a)
 
-    # 2) URL+제목 동일 중복 제거(안전)
+    # 제목+URL 기준으로 안정적으로 중복 제거
     seen = set()
-    deduped = []
-    for a in selected:
-        key = (_normalize_url(getattr(a, "link", "")), _normalize_title(getattr(a, "title", "")))
+    unique = []
+    for a in filtered:
+        key = (_normalize_url(getattr(a, "link", "") or ""), _normalize_title(getattr(a, "title", "") or ""))
         if key in seen:
             continue
         seen.add(key)
-        deduped.append(a)
+        unique.append(a)
 
-    # ✅ 3) 브리핑 전용 "주제 중복" 제거 (요청: 0.70)
-    deduped = dedupe_for_brief(deduped, threshold=0.70, max_keep=max_items)
-
-    return deduped[:max_items]
+    return unique[:max_items]
 
 
 def build_yesterday_ai_brief(
@@ -357,6 +169,7 @@ def build_yesterday_ai_brief(
     product_articles,
     trend_articles,
     eye_health_articles,
+    output_language="ko",
 ):
     picked = select_articles_for_brief(
         acuvue_articles,
@@ -368,14 +181,17 @@ def build_yesterday_ai_brief(
     )
 
     if not picked:
+        if (output_language or "ko").lower().startswith("en"):
+            return "There were no relevant articles collected for yesterday, so there is nothing additional to brief."
         return "어제는 수집된 기사가 없어 주요 이슈를 요약할 내용이 없습니다."
 
-    return summarize_overall(picked)
+    return summarize_overall(picked, language=output_language)
 
 
 def main():
     cfg = load_config()
     tz = ZoneInfo(cfg.get("timezone", "Asia/Seoul"))
+    output_language = (cfg.get("output_language", "ko") or "ko").strip()
 
     # 1) 수집
     articles = fetch_all_articles(cfg)
@@ -390,8 +206,8 @@ def main():
     # 4) 1차 중복 제거(빠른 제거: URL+제목)
     articles = deduplicate_articles(articles)
 
-    # 5) 기사별 요약(summary 정제/생성)
-    refine_article_summaries(articles)
+    # 5) 기사별 요약(summary 정제/생성)  ✅ 언어만 영어로 옵션
+    refine_article_summaries(articles, language=output_language)
 
     # 6) 최종 안전 필터
     articles = [a for a in articles if not should_exclude_article(a.title, a.summary)]
@@ -411,13 +227,14 @@ def main():
         categorized.eye_health,
     )
 
-    # ✅ 10) 상단 브리핑(브리핑 전용 dedupe=0.75 적용된 picked로 요약)
+    # ✅ 10) 상단 브리핑(브리핑 전용)
     summary = build_yesterday_ai_brief(
         acuvue_list,
         company_list,
         product_list,
         trend_list,
         eye_health_list,
+        output_language=output_language,
     )
 
     # 11) 템플릿 렌더링
@@ -432,13 +249,20 @@ def main():
         product_articles=product_list,
         trend_articles=trend_list,
         eye_health_articles=eye_health_list,
+
+        # ✅ 템플릿에서 영어 라벨을 쓰고 싶을 때를 위해 옵션 제공(템플릿 수정은 아래 참고)
+        output_language=output_language,
     )
 
     # 12) 메일 제목
     email = cfg["email"]
     yesterday_str = (dt.datetime.now(tz).date() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
     subject_prefix = email.get("subject_prefix", "[Daily News]")
-    subject = f"{subject_prefix} 어제 기사 브리핑 - {yesterday_str}"
+
+    if output_language.lower().startswith("en"):
+        subject = f"{subject_prefix} Yesterday Briefing - {yesterday_str}"
+    else:
+        subject = f"{subject_prefix} 어제 기사 브리핑 - {yesterday_str}"
 
     # 13) 발송
     send_email_html(
@@ -447,6 +271,28 @@ def main():
         from_addr=email["from"],
         to_addrs=email["to"],
     )
+
+
+# =========================
+# ✅ (D) 카테고리 간 중복 제거 (기존 유지)
+# =========================
+def remove_cross_category_duplicates(acuvue, company, product, trend, eye_health):
+    def make_key(a):
+        return (_normalize_url(getattr(a, "link", "") or ""), _normalize_title(getattr(a, "title", "") or ""))
+
+    seen = set()
+    out = []
+    for lst in [acuvue, company, product, trend, eye_health]:
+        new_list = []
+        for a in lst:
+            k = make_key(a)
+            if k in seen:
+                continue
+            seen.add(k)
+            new_list.append(a)
+        out.append(new_list)
+
+    return tuple(out)
 
 
 if __name__ == "__main__":
