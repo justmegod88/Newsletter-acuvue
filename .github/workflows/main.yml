@@ -2,20 +2,15 @@ name: Daily News Newsletter
 
 on:
   schedule:
-   # - cron: "40 23 * * *"  
-   # 매일 UTC 23:40 = 한국시간 08:40
-   # ✅ 매일 UTC 00:00 = 한국시간(KST) 오전 09:00
-     - cron: "0 0 * * *"
- 
+    - cron: "0 0 * * *"  # UTC 00:00 = KST 09:00
   workflow_dispatch:
-
 
 jobs:
   run-newsletter:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository.
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -28,16 +23,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ✅ 실제 실행 시각을 로그로 확인 (UTC & KST 같이 출력)
-      - name: Debug time (UTC & KST)
+      # ✅ 여기서 env가 실제로 들어왔는지 확인(값은 출력 안 함)
+      - name: Debug env presence
+        env:
+          BREVO_SMTP_USER: ${{ secrets.BREVO_SMTP_USER }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          echo "UTC now: $(date -u)"
-          echo "KST now: $(TZ=Asia/Seoul date)"
+          echo "BREVO_SMTP_USER set? -> $([[ -n "$BREVO_SMTP_USER" ]] && echo YES || echo NO)"
+          echo "BREVO_SMTP_PASSWORD set? -> $([[ -n "$BREVO_SMTP_PASSWORD" ]] && echo YES || echo NO)"
+          echo "OPENAI_API_KEY set? -> $([[ -n "$OPENAI_API_KEY" ]] && echo YES || echo NO)"
 
       - name: Run newsletter script
         env:
           TZ: Asia/Seoul
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          BREVO_SMTP_USER: ${{ secrets.BREVO_SMTP_USER }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          FROM_NAME: ${{ secrets.FROM_NAME }}
         run: |
           python newsletter.py
