@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -33,7 +33,7 @@
       font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", Arial,sans-serif; 
     }
 
-    /* 어제 기사 AI 브리핑 (하늘색 영역) */
+    /* Yesterday AI Briefing (light blue) */
     .summary{
       background:#eaf3ff;
       padding:12px 14px;
@@ -45,7 +45,7 @@
       font-family:  "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", Arial,sans-serif; 
     }
 
-    /* 카드 (ACUVUE 기사) */
+    /* Cards (ACUVUE articles) */
     .card{
       border:1px solid #e0e0e0;
       padding:12px;
@@ -74,7 +74,7 @@
       font-family:  "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", Arial,sans-serif; 
     }
 
-    /* 테이블 (Outlook-safe) */
+    /* Table (Outlook-safe) */
     table.news-table{
       width:100%;
       border-collapse:collapse;
@@ -99,7 +99,7 @@
       text-align:left;
       font-weight:700;
 
-      /* ✅ 테이블 헤더 상하 중앙 느낌 */
+      /* ✅ Table header vertical alignment */
       vertical-align:middle;
       height:38px;
       line-height:38px;
@@ -123,13 +123,13 @@
       margin-top:22px;
     }
 
-    /* ✅ 모바일(기존 유지) */
+    /* ✅ Mobile (keep) */
     @media only screen and (max-width: 480px){
       .container{ padding:12px; }
       .card-title{ font-size:14px; }
     }
 
-    /* ✅ PC 웹메일(지메일 등)에서만: 바깥 배경 + 컨테이너 테두리 */
+    /* ✅ Desktop webmail (Gmail etc): outer bg + container border */
     @media only screen and (min-width: 1024px){
       body{ background:#f5f7fb; }
       .container{
@@ -144,7 +144,7 @@
 </head>
 
 <body>
-  <!-- ✅ Outlook(PC) 전용: 바깥 배경 + 카드 테두리 적용 -->
+  <!-- ✅ Outlook(PC): outer bg + card border -->
   <!--[if mso]>
   <table role="presentation" width="100%" align="center" cellpadding="0" cellspacing="0" border="0" style="background:#f5f7fb;">
     <tr>
@@ -156,7 +156,7 @@
 
   <div class="container">
 
-    <!-- 헤더 -->
+    <!-- Header -->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;">
       <tr>
         <td align="left" valign="middle" style="padding:0;">
@@ -180,14 +180,14 @@
       </tr>
     </table>
 
-    <!-- 어제 기사 AI 브리핑 -->
+    <!-- Yesterday AI Briefing -->
     <div class="summary">
-      <strong>[어제 기사 AI 브리핑]</strong><br />
+      <strong>[Yesterday AI Briefing]</strong><br />
       {{ yesterday_summary }}
     </div>
 
-    <!-- ACUVUE 기사 -->
-    <h2>🔷 ACUVUE 기사</h2>
+    <!-- ACUVUE -->
+    <h2>🔷 ACUVUE</h2>
 
     {% if acuvue_articles %}
       {% for a in acuvue_articles %}
@@ -195,16 +195,16 @@
         <div class="card-title">{{ a.title }}</div>
         <div class="card-meta">{{ a.source }} • {{ a.published.strftime("%Y-%m-%d %H:%M") }}</div>
         <div class="card-summary">{{ a.summary }}</div>
-        <a href="{{ a.link }}" target="_blank">기사 보기 →</a>
+        <a href="{{ a.link }}" target="_blank">Open article →</a>
       </div>
       {% endfor %}
     {% else %}
       <div class="card" style="margin-bottom:18px;">
-        어제는 별도의 아큐브 관련 기사가 수집되지 않았습니다.
+        No ACUVUE-related articles were collected yesterday.
       </div>
     {% endif %}
 
-    <h2>📋 어제 기사 리스트</h2>
+    <h2>📋 Yesterday Article List</h2>
 
     {% macro table_block(title, articles) %}
     {% set items = articles or [] %}
@@ -222,17 +222,17 @@
         </colgroup>
 
         <tr>
-          <th>제목</th>
-          <th>언론사</th>
-          <th>요약</th>
-          <th>링크</th>
+          <th>Title</th>
+          <th>Source</th>
+          <th>Summary</th>
+          <th>Link</th>
         </tr>
 
         {% if items|length == 0 %}
-        <!-- ✅ 기사 0건이어도 테이블 형태/배열 유지 -->
+        <!-- ✅ Keep table layout even when empty -->
         <tr>
           <td colspan="4" style="color:#777; padding:12px 8px;">
-            수집된 기사가 없습니다.
+            No articles collected.
           </td>
         </tr>
         {% else %}
@@ -241,7 +241,7 @@
             <td>{{ a.title }}</td>
             <td>{{ a.source }}</td>
             <td>{{ a.summary }}</td>
-            <td><a href="{{ a.link }}" target="_blank">보기</a></td>
+            <td><a href="{{ a.link }}" target="_blank">Open</a></td>
           </tr>
           {% endfor %}
         {% endif %}
@@ -249,13 +249,13 @@
     </div>
     {% endmacro %}
 
-    {{ table_block("1) 업체별 활동 (제조사)", company_articles) }}
-    {{ table_block("2) 제품 카테고리별", product_articles) }}
-    {{ table_block("3) 업계 동향", trend_articles) }}
-    {{ table_block("4) 눈 건강 · 캠페인", eye_health_articles) }}
+    {{ table_block("1) Manufacturer Activities", company_articles) }}
+    {{ table_block("2) Product Categories", product_articles) }}
+    {{ table_block("3) Industry Trends", trend_articles) }}
+    {{ table_block("4) Eye Health & Campaigns", eye_health_articles) }}
 
     <div class="footer">
-      이 뉴스레터는 AI로 자동 생성되었습니다.
+      This newsletter is automatically generated by AI.
     </div>
 
   </div>
