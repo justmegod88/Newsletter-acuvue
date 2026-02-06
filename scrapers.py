@@ -37,26 +37,25 @@ class Article:
 # =========================
 # Exclusion rules
 # =========================
-FINANCE_KEYWORDS = [
-    "주가", "주식", "증시", "투자", "재무", "실적",
-    "매출", "영업이익", "순이익", "배당", "부동산",
-    "상장", "ipo", "공모", "증권", "리포트", "선물",
-    "목표주가", "시가총액", "ir", "주주", "관련주","카드","금융",
-]
 
-# ✅ 약업(야쿠프/약업신문) 도메인: 날짜 오류(과거 기사 유입) 방지용
+# ✅도메인: 날짜 오류(과거 기사 유입) 방지용
 YAKUP_BLOCK_HOSTS = [
     "yakup.com", "www.yakup.com",
     "yakup.co.kr", "www.yakup.co.kr",
+    "kyosu.net","www.kyosu.net",
+    "www.kr.investing.com","www.investing.com",
+    "www.kr.investing.com",    
+    "www.simplywall.st","simplywall.st","topstarnews.net","www.topstarnews.net",
+    "www.pinpointnews.co.kr", "pinpointnews.co.kr",
 ]
-YAKUP_BLOCK_TOKENS = ["약업", "약업신문", "약학신문", "yakup"]
+YAKUP_BLOCK_TOKENS = ["약업", "약업신문", "약학신문", "yakup","simplywall"]
 
 # ✅ 재배포/애그리게이터(원문 아닌 경우가 많아서 날짜 오염 유발) - 우선 차단
 AGGREGATOR_BLOCK_HOSTS = [
     "msn.com", "www.msn.com",
     "flipboard.com", "www.flipboard.com",
-    "smartnews.com", "www.smartnews.com",
-    "newsbreak.com", "www.newsbreak.com","kyosu.net","www.kyosu.net"
+    #"smartnews.com", "www.smartnews.com",
+    "newsbreak.com", "www.newsbreak.com",
 ]
 
 # ✅ (추가) 구글뉴스 RSS에서 링크가 news.google.com으로 남는 경우가 많아서
@@ -64,8 +63,16 @@ AGGREGATOR_BLOCK_HOSTS = [
 AGGREGATOR_BLOCK_SOURCES = [
     "msn",
     "flipboard",
-    "smartnews",
+    #"smartnews",
     "newsbreak",
+]
+
+# 투자/ 부동산 (완전제외)
+FINANCE_KEYWORDS = [
+    "주가", "주식", "증시", "투자", "재무", "실적", "투자 전략", "투자처",
+    "매출", "영업이익", "순이익", "배당", "부동산",
+    "상장", "ipo", "공모", "증권", "리포트", "선물",
+    "목표주가", "시가총액", "ir", "주주", "관련주","카드","금융",
 ]
 
 # 연예 / 예능 / 오락
@@ -77,7 +84,7 @@ ENTERTAINMENT_HINTS = [
     "팬미팅", "콘서트", "인간극장", "극장",
 ]
 
-# 인사 / 승진
+# 인사 / 승진 (화이트리스트만 살림)
 PERSONNEL_HINTS = [
     "인사", "임원 인사", "승진", "선임", "발탁",
     "대표이사", "사장", "부사장", "전무", "상무",
@@ -85,14 +92,21 @@ PERSONNEL_HINTS = [
     "취임", "영입", "양성",
 ]
 
-# 가수 다비치
+# 복지/ 모금
+volunteer_HINTS = [
+    "봉사","사회복지","봉사단","안경 지원", "지역 주민","봉사 활동", "복지",    
+]
+
+
+
+# 가수 다비치 (화이트리스트만 살림)
 DAVICHI_SINGER_NAMES = ["강민경", "이해리"]
 DAVICHI_SINGER_HINTS = [
     "가수", "음원", "신곡", "컴백", "앨범", "연예인", "개그맨", "연기", "배우",
     "뮤지컬", "뮤지션", "1위", "콘서트", "공연", "뮤직비디오",
     "강민경", "이해리", "개그", "듀오", "카메라", "드라마", "연극", "탤런트",
     "차트", "유튜브", "방송", "예능", "ost", "연예", "무대", "히든싱어", "가요",
-    "음악", "시상식", "프로그램",
+    "음악", "시상식", "프로그램","지드래곤",
 ]
 
 # 얼굴/뷰티 노안
@@ -107,27 +121,32 @@ AD_SNIPPET_HINTS = [
     "논란", "깜짝", "지금 다운로드", "지금 클릭", "지금 확인",
 ]
 
-# 기타 문구 (그외 삭제하고 싶은 워딩_수정)
+# 기타 문구 (완전 삭제하고 싶은 워딩_수정)
 ETC_HINTS = [
     "테슬라", "자동차", "제약", "바이오","백신","얀센","컨슈머","서지컬","치료제","메디컬", "개원", "모금", 
-    "환청","진료", "아산아이톡안과", "이웃사랑", "질환", "환자", "베드로안경원"
+    "환청",#"진료", 
+    "아산아이톡안과", "이웃사랑", "환자", "베드로안경원","강남스마일안과", "무신사", "investing", "샤르망","연말정산","사설", "체납","안과병원",
+    "작가","에세이","소설", "한국어","봉합사","스텔라라","눈썰매","농촌체험","뇌경색","물리치료사", "광주신세계안과","안내렌즈삽입술","CES 2026",
+    "장길현","더블어민주당","고성군의원","세미콘 코리아","반도체","원자력",
 ]
+
+
 
 # 광학/렌즈 업계 화이트리스트
 INDUSTRY_WHITELIST = [
-    "호야", "에실로", "노안 렌즈", "노안 교정",
-    "렌즈", "콘택트렌즈", "오렌즈", "하파크리스틴",
-    "검안", "시력", "콘택트 렌즈", "contact lens",
+    "노안 렌즈", 
+    "콘택트렌즈", "오렌즈", 
+    "콘택트 렌즈", "contact lens",
     "아큐브", "acuvue",
-    "알콘", "쿠퍼비전", "바슈롬", "쿠퍼 비젼",
-    "인터로조","렌즈미", "안경","안경원",
+    "알콘 렌즈", "쿠퍼비전", "바슈롬", "쿠퍼 비젼",
+    "인터로조","렌즈미", 
 ]
 
 # ✅ (추가) 무신사/K패션 같은 "패션 잡음" 차단용
 # - 단, INDUSTRY_WHITELIST가 있으면 살림
 FASHION_HINTS = [
-    "무신사", "k패션", "패션", "의류", "룩북", "컬렉션", "오프화이트",
-    "스타일", "코디", "브랜드", "쇼핑", "온라인몰", "패션플랫폼", "편집숍"
+    "k패션", "패션", "의류", "룩북", "컬렉션", "오프화이트",
+    "스타일", "코디", "브랜드", "쇼핑", "온라인몰", "패션플랫폼", "편집숍", "케이스티파이",
 ]
 
 
@@ -173,7 +192,10 @@ PRESS_DOMAIN_MAP_BASE = {
    "domin.co.kr": "전북도민일보",
    "cctimes.kr": "충청타임즈",
    "stardailynews": "스타데일리",
-    
+   "mksports.co.kr":"mk스포츠",
+   "newdaily.co.kr": "뉴데일리",
+   "osen.co.kr": "osen",
+
     
 
 
@@ -271,10 +293,8 @@ def should_exclude_article(title: str, summary: str = "", is_naver: bool = False
     full = _normalize(title + " " + summary)
 
     # ✅ (추가) 무신사/K패션 잡음 제거
-    # - 화이트리스트(콘택트렌즈 등) 있으면 살림
     if any(h in full for h in FASHION_HINTS):
-        if not _has_industry_whitelist(full):
-            return True
+        return True
 
     # ✅ 1) 투자/재무: 화이트리스트 있어도 무조건 제거
     if any(k in full for k in FINANCE_KEYWORDS):
@@ -311,8 +331,12 @@ def should_exclude_article(title: str, summary: str = "", is_naver: bool = False
         if any(h in summary for h in AD_SNIPPET_HINTS):
             return True
 
-  
+   # 봉사 
+    if any(h in full for h in volunteer_HINTS):
+        if not _has_industry_whitelist(full):
+            return True   
 
+    
     # ✅ 7) 요약이 너무 짧은 카드형 문구 제거
     # ✅ 네이버 기사(is_naver=True)에는 적용하지 않음
     if (not is_naver) and summary and len(summary) < 40:
@@ -380,6 +404,10 @@ def clean_summary(raw):
     text = raw or ""
     text = re.sub(r"<.*?>", " ", text)
     text = re.sub(r"https?://\S+", " ", text)
+  
+    # ✅ 추가: https 없이 붙는 도메인 텍스트 제거 (요약 끝에 사이트명 붙는 케이스)
+    text = re.sub(r"\b[a-z0-9\-]+\.(?:co\.kr|or\.kr|go\.kr|ac\.kr|com|net|org|kr|st)\b", " ", text, flags=re.I)    
+  
     text = html.unescape(text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -539,13 +567,11 @@ def fetch_from_google_news(query, source_name, tz, cfg=None):
             if _is_aggregator_source(raw_source):
                 continue
 
-            # ✅ source가 도메인처럼 보이면 매핑으로 "언론사명" 변환 (없으면 기존 유지)
             source = raw_source
             if _looks_like_domain(raw_source):
                 mapped = press_map.get(_strip_www(raw_source), "")
-                if mapped:
-                    source = mapped
-
+                # ✅ 매핑이 없으면 도메인을 노출하지 말고, source_name(예: GoogleNews/업계지명)로 대체
+                source = mapped if mapped else source_name
             if should_exclude_article(title, summary, is_naver=False):
                 continue
 

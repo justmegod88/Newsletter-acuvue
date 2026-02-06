@@ -126,9 +126,9 @@ def _pick_representative(group):
 
 
 # =========================
-# ✅ (C) 기사 리스트용 중복 제거 + 묶기 (기존 유지: threshold=0.78)
+# ✅ (C) 기사 리스트용 중복 제거 + 묶기 (기존 유지: threshold=0.75)
 # =========================
-def dedupe_and_group_articles(articles, threshold: float = 0.78):
+def dedupe_and_group_articles(articles, threshold: float = 0.75):
     """
     반환: 대표 기사 리스트
     대표 기사에는 rep.duplicates = [{source, link, title}, ...] 가 생김
@@ -167,16 +167,26 @@ def dedupe_and_group_articles(articles, threshold: float = 0.78):
             seen_ref.add(gid)
             uniq_cands.append(g)
 
+        # ✅ [수정 1곳] 버킷이 안 잡혀서 비교 자체를 못 하는 경우를 막기 위한 fallback
+        # (버킷 후보가 없으면 최근 그룹 일부와라도 비교해서 0.78 같은 케이스를 잡도록)
+        if not uniq_cands:
+            uniq_cands = merged_groups[-50:]  # 필요시 50만 조절
+
         merged = False
         for existing_grp in uniq_cands:
             ex = existing_grp[0]
             ex_title = getattr(ex, "title", "") or ""
             ex_summary = getattr(ex, "summary", "") or ""
 
-            if base_summary and ex_summary:
-                sim = _similarity(base_summary, ex_summary)
-            else:
-                sim = _similarity(base_title, ex_title)
+            # ✅ 제목 유사도를 우선으로 사용 (요약은 기사마다 표현이 달라서 중복이 안 잡히는 경우가 많음)
+            title_sim = _similarity(base_title, ex_title)
+
+            # 요약은 "보조"로만 사용 (둘 다 있고, 어느 정도 길이가 있을 때만)
+            summary_sim = 0.0
+            if base_summary and ex_summary and len(base_summary) >= 80 and len(ex_summary) >= 80:
+                summary_sim = _similarity(base_summary, ex_summary)
+
+            sim = max(title_sim, summary_sim)
 
             if sim >= threshold:
                 existing_grp.extend(grp)
@@ -232,7 +242,7 @@ def remove_cross_category_duplicates(*category_lists):
 
 
 # =========================
-# ✅ (E) 브리핑(상단 요약) 전용 중복 제거: threshold=0.78 (요청 반영)
+# ✅ (E) 브리핑(상단 요약) 전용 중복 제거: threshold=0.75 (요청 반영)
 # =========================
 def _brief_norm(s: str) -> str:
     s = (s or "").lower().strip()
@@ -284,7 +294,7 @@ def dedupe_for_brief(articles, threshold: float = 0.70, max_keep: int = 10):
 
 
 # =========================
-# ✅ (F) 브리핑 입력 후보 선택 (카테고리 분산 + 빈 summary 제외) + 브리핑 전용 dedupe(0.78)
+# ✅ (F) 브리핑 입력 후보 선택 (카테고리 분산 + 빈 summary 제외) + 브리핑 전용 dedupe(0.75)
 # =========================
 def _has_summary(a) -> bool:
     s = (getattr(a, "summary", "") or "").strip()
@@ -386,8 +396,8 @@ def main():
     # 6) 최종 안전 필터
     articles = [a for a in articles if not should_exclude_article(a.title, a.summary)]
 
-    # ✅ 7) 기사 리스트용 중복 묶기(기존 유지: 0.78)
-    articles = dedupe_and_group_articles(articles, threshold=0.78)
+    # ✅ 7) 기사 리스트용 중복 묶기(기존 유지: 0.75)
+    articles = dedupe_and_group_articles(articles, threshold=0.75)
 
     # 8) 분류
     categorized = categorize_articles(articles)
@@ -401,7 +411,7 @@ def main():
         categorized.eye_health,
     )
 
-    # ✅ 10) 상단 브리핑(브리핑 전용 dedupe=0.78 적용된 picked로 요약)
+    # ✅ 10) 상단 브리핑(브리핑 전용 dedupe=0.75 적용된 picked로 요약)
     summary = build_yesterday_ai_brief(
         acuvue_list,
         company_list,
